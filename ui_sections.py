@@ -1,9 +1,10 @@
 from datetime import datetime
 
 import pandas as pd
+import plotly.express as px
 import streamlit as st
 
-from data_utils import calculate_sentiment_counts, prepare_timeline_data
+from data_utils import calculate_sentiment_counts, prepare_timeline_data_by_period
 from visualizer import draw_sentiment_charts
 
 
@@ -50,8 +51,27 @@ def render_sentiment_section(df):
 
 def render_timeline_section(df):
     with st.expander("📈 시간 흐름에 따른 감정 점수 추이", expanded=True):
-        timeline_df = prepare_timeline_data(df)
-        st.line_chart(data=timeline_df, x="date", y="sentiment_score")
+        period = st.radio(
+            "집계 단위 선택",
+            ["일별", "주별", "월별"],
+            horizontal=True,
+            key="timeline_period",
+        )
+
+        timeline_df = prepare_timeline_data_by_period(df, period)
+
+        min_date = timeline_df["date"].min()
+        max_date = timeline_df["date"].max()
+
+        fig = px.line(
+            timeline_df,
+            x="date",
+            y="sentiment_score",
+            markers=True,
+            labels={"date": "날짜", "sentiment_score": f"{period} 감정 점수 합계"},
+        )
+        fig.update_xaxes(range=[min_date, max_date], rangeslider_visible=False)
+        st.plotly_chart(fig, width="stretch")
         st.info("💡 0보다 위면 긍정, 아래면 부정적인 여론을 의미합니다.")
 
 

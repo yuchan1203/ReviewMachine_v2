@@ -7,7 +7,7 @@ from transformers import logging
 logging.set_verbosity_error()
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
-from review_pipeline import load_source_dataframe, run_sentiment_analysis
+from review_pipeline import ReviewPipelineError, load_source_dataframe, run_sentiment_analysis
 from session_utils import initialize_session_state
 from ui_sections import (
     render_detail_section,
@@ -43,21 +43,26 @@ with st.sidebar:
 
 
 if analyze_button:
-    with st.spinner('데이터를 준비 중입니다...'):
-        df, is_already_analyzed = load_source_dataframe(
-            menu=menu,
-            app_id=app_id,
-            review_count=review_count if menu == "실시간 크롤링" else None,
-            uploaded_file=uploaded_file if menu == "CSV 파일 업로드" else None,
-        )
+    try:
+        with st.spinner('데이터를 준비 중입니다...'):
+            df, is_already_analyzed = load_source_dataframe(
+                menu=menu,
+                app_id=app_id,
+                review_count=review_count if menu == "실시간 크롤링" else None,
+                uploaded_file=uploaded_file if menu == "CSV 파일 업로드" else None,
+            )
 
-        if df is not None:
-            if not is_already_analyzed:
-                with st.spinner('AI 감정 분석 중...'):
-                    df = run_sentiment_analysis(df)
-            st.session_state.analyzed_df = df
-            st.session_state.current_app_id = app_id
-            st.success("데이터 분석이 완료되었습니다!")
+            if df is not None:
+                if not is_already_analyzed:
+                    with st.spinner('AI 감정 분석 중...'):
+                        df = run_sentiment_analysis(df)
+                st.session_state.analyzed_df = df
+                st.session_state.current_app_id = app_id
+                st.success("데이터 분석이 완료되었습니다!")
+    except ReviewPipelineError as exc:
+        st.error(str(exc))
+    except Exception:
+        st.error("예상치 못한 오류가 발생했습니다. 잠시 후 다시 시도해주세요.")
 
 
 if st.session_state.analyzed_df is not None:
