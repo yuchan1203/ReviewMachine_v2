@@ -65,11 +65,24 @@ def load_source_dataframe(
     return None, False
 
 
-def run_sentiment_analysis(df):
+def run_sentiment_analysis(df, progress_callback=None, batch_size=32):
     validate_input_dataframe(df)
     analyzer = ReviewAnalyzer()
     texts = df["content"].fillna("").astype(str).tolist()
-    analysis_results = analyzer.analyze_list(texts)
+    total = len(texts)
+    analysis_results = []
+
+    if total == 0:
+        return df
+
+    safe_batch_size = max(1, int(batch_size))
+    for start_idx in range(0, total, safe_batch_size):
+        end_idx = min(start_idx + safe_batch_size, total)
+        batch_texts = texts[start_idx:end_idx]
+        analysis_results.extend(analyzer.analyze_list(batch_texts))
+        if progress_callback is not None:
+            progress_callback(end_idx, total)
+
     df["sentiment"] = [r["sentiment"] for r in analysis_results]
     df["sentiment_score"] = [r["sentiment_score"] for r in analysis_results]
     df["confidence"] = [r["confidence"] for r in analysis_results]
