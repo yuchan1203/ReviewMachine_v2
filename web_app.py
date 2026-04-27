@@ -43,10 +43,16 @@ if analyze_button:
                 st.stop()
         
         if df is not None:
-            # 2. 분석 엔진 호출
             analyzer = ReviewAnalyzer()
             texts = df['content'].tolist()
-            predictions = analyzer.analyze(texts)
+            
+            # analyzer.py에서 업그레이드한 함수 호출
+            analysis_results = analyzer.analyze_list(texts)
+            
+            # 결과 대입 (코드가 훨씬 간결해집니다!)
+            df['sentiment'] = [r['sentiment'] for r in analysis_results]
+            df['sentiment_score'] = [r['sentiment_score'] for r in analysis_results]
+            df['confidence'] = [r['confidence'] for r in analysis_results]
 
         # --- 추가되는 시계열 분석 로직 ---
         st.subheader("📈 시간 흐름에 따른 감성 추이")
