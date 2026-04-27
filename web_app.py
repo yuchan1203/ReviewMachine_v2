@@ -29,30 +29,31 @@ with st.sidebar:
 
 # --- 메인 분석 로직 영역 ---
 if analyze_button:
-    df = None # 분석할 데이터 저장 변수
+    df = None
 
-    with st.spinner('데이터 준비 및 AI 분석 중...'):
-        # 1. 데이터 로드 (분기 처리)
+    with st.spinner('데이터를 준비 중입니다...'):
+        # 1. 데이터 소스 확보
         if menu == "실시간 크롤링":
             df = get_reviews(app_id, count=review_count)
+            is_already_analyzed = False
         elif menu == "CSV 파일 업로드" and uploaded_file is not None:
             df = pd.read_csv(uploaded_file)
-            # 필수 컬럼(content)이 있는지 확인
-            if 'content' not in df.columns:
-                st.error("CSV 파일에 'content' 컬럼이 필요합니다.")
-                st.stop()
-        
+            # 이미 분석된 파일인지 확인 (핵심 컬럼 존재 여부 체크)
+            is_already_analyzed = all(col in df.columns for col in ['sentiment', 'sentiment_score', 'confidence'])
+
         if df is not None:
-            analyzer = ReviewAnalyzer()
-            texts = df['content'].tolist()
-            
-            # analyzer.py에서 업그레이드한 함수 호출
-            analysis_results = analyzer.analyze_list(texts)
-            
-            # 결과 대입 (코드가 훨씬 간결해집니다!)
-            df['sentiment'] = [r['sentiment'] for r in analysis_results]
-            df['sentiment_score'] = [r['sentiment_score'] for r in analysis_results]
-            df['confidence'] = [r['confidence'] for r in analysis_results]
+            # 2. 분석 단계: 이미 분석된 파일이 아니라면 AI 엔진 가동
+            if not is_already_analyzed:
+                with st.spinner('AI 감정 분석 중...'):
+                    analyzer = ReviewAnalyzer()
+                    texts = df['content'].tolist()
+                    analysis_results = analyzer.analyze_list(texts)
+                    
+                    df['sentiment'] = [r['sentiment'] for r in analysis_results]
+                    df['sentiment_score'] = [r['sentiment_score'] for r in analysis_results]
+                    df['confidence'] = [r['confidence'] for r in analysis_results]
+            else:
+                st.success("이미 분석된 파일입니다. 저장된 데이터를 불러옵니다.")
 
         # --- 추가되는 시계열 분석 로직 ---
         st.subheader("📈 시간 흐름에 따른 감성 추이")
@@ -101,9 +102,9 @@ if analyze_button:
         # 7. 다운로드 버튼
         csv = df.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig')
         st.download_button(
-            label="분석 결과 CSV 다운로드",
+            label="분석 결과가 포함된 CSV 다운로드",
             data=csv,
-            file_name=f"analysis_{app_id}.csv",
+            file_name=f"analyzed_{app_id}.csv",
             mime="text/csv",
         )
         st.success("데이터 분석이 완료되었습니다!")
