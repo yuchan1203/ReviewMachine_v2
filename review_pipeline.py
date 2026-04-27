@@ -35,10 +35,18 @@ def validate_input_dataframe(df):
         raise ReviewPipelineError("리뷰 본문(content)에 분석 가능한 텍스트가 없습니다.")
 
 
-def load_source_dataframe(menu, app_id, review_count, uploaded_file):
+def load_source_dataframe(
+    menu, app_id, review_count, start_date, end_date, uploaded_file, sample_mode="latest"
+):
     if menu == "실시간 크롤링":
         try:
-            df = get_reviews(app_id, count=review_count)
+            df = get_reviews(
+                app_id,
+                count=review_count,
+                start_date=start_date,
+                end_date=end_date,
+                sample_mode=sample_mode,
+            )
         except Exception as exc:
             raise ReviewPipelineError(
                 "리뷰 크롤링에 실패했습니다. 앱 ID를 확인하거나 잠시 후 다시 시도해주세요."
