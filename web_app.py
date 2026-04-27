@@ -57,29 +57,38 @@ if analyze_button:
         # --- 추가되는 시계열 분석 로직 ---
         st.subheader("📈 시간 흐름에 따른 감성 추이")
 
-        # 1. 날짜 형식 변환 및 정렬
+        # 순서 고정을 위한 설정
+        sentiment_order = ['매우 부정', '부정', '보통', '긍정', '매우 긍정']
+        sentiment_counts = df['sentiment'].value_counts().reindex(sentiment_order, fill_value=0)
+
+        # 막대 그래프 출력
+        st.bar_chart(sentiment_counts)
+
+        # 시계열 그래프 (기존 점수 체계 유지)
+        st.subheader("📈 시간 흐름에 따른 감성 점수 추이")
         df['at'] = pd.to_datetime(df['at'])
-        df = df.sort_values('at')
-
-        # 2. 감성 점수 계산 (긍정: 1, 부정: -1)
-        df['sentiment_score'] = df['sentiment'].apply(lambda x: 1 if x == '긍정' else -1)
-
-        # 3. 일자별 평균 점수 집계 (시각화를 위해 날짜만 추출)
         df['date'] = df['at'].dt.date
         timeline_df = df.groupby('date')['sentiment_score'].mean().reset_index()
-
-        # 4. 꺾은선 그래프 표시
         st.line_chart(data=timeline_df, x='date', y='sentiment_score')
         
         st.info("💡 위 그래프가 0보다 위에 있으면 긍정적, 아래에 있으면 부정적인 여론이 강했음을 의미합니다.")
 
-        # 4. 결과 시각화 - 요약 통계
-        col1, col2 = st.columns(2)
-        pos_count = len(df[df['sentiment'] == '긍정'])
-        neg_count = len(df[df['sentiment'] == '부정'])
+        # 4. 결과 시각화 - 요약 통계 (5개 컬럼으로 확장)
+        col1, col2, col3, col4, col5 = st.columns(5)
+        
+        # 각 상태별 개수 계산
+        v_pos = len(df[df['sentiment'] == '매우 긍정'])
+        pos = len(df[df['sentiment'] == '긍정'])
+        neu = len(df[df['sentiment'] == '보통'])
+        neg = len(df[df['sentiment'] == '부정'])
+        v_neg = len(df[df['sentiment'] == '매우 부정'])
 
-        col1.metric("긍정 리뷰", f"{pos_count}개")
-        col2.metric("부정 리뷰", f"{neg_count}개")
+        # 메트릭 표시
+        col1.metric("매우 긍정", f"{v_pos}개")
+        col2.metric("긍정", f"{pos}개")
+        col3.metric("보통", f"{neu}개")
+        col4.metric("부정", f"{neg}개")
+        col5.metric("매우 부정", f"{v_neg}개")
 
         # 5. 차트 표시
         st.subheader("감성 분포")

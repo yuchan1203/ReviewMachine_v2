@@ -9,17 +9,27 @@ class ReviewAnalyzer:
         )
 
     def _refine_sentiment(self, result):
-        """내부용: 개별 분석 결과를 5단계로 세분화"""
+        """제안해주신 대칭적 5단계 분류 로직"""
         label = result['label']
         score = result['score']
         
-        if label == '1': # 긍정 모델 기준
-            if score >= 0.85: return '매우 긍정', 2
-            else: return '긍정', 1
-        else: # 부정 모델 기준
-            if score >= 0.85: return '매우 부정', -2
-            elif score >= 0.55: return '부정', -1
-            else: return '보통', 0
+        # 1. 긍정 확신 구간 (label '1')
+        if label == '1':
+            if score >= 0.85:
+                return '매우 긍정', 2
+            elif score >= 0.55:
+                return '긍정', 1
+            else:
+                return '보통', 0
+                
+        # 2. 부정 확신 구간 (label '0')
+        else:
+            if score >= 0.85:
+                return '매우 부정', -2
+            elif score >= 0.55:
+                return '부정', -1
+            else:
+                return '보통', 0
 
     def analyze_list(self, texts):
         """리뷰 리스트를 받아 정제된 결과 리스트를 반환"""
