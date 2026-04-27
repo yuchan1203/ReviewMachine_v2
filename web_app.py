@@ -21,7 +21,7 @@ initialize_session_state()
 
 # 화면 설정
 st.set_page_config(page_title="ReviewMachine v2", layout="wide")
-st.title("📊 ReviewMachine v2: 앱 리뷰 감성 분석기")
+st.title("📊 ReviewMachine v2: 앱 리뷰 감정 분석기")
 st.markdown("구글 플레이 스토어의 앱 ID를 입력하여 실시간 리뷰 분석 결과를 확인하세요.")
 
 # 사이드바 설정

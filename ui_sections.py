@@ -30,23 +30,25 @@ def render_file_info_section(df, current_app_id):
 
 
 def render_sentiment_section(df):
-    with st.expander("📊 감성 분포 시각화 및 통계", expanded=False):
-        sentiment_counts = calculate_sentiment_counts(df)
-        col1, col2, col3, col4, col5 = st.columns(5)
-        col1.metric("매우 긍정", f"{sentiment_counts['매우 긍정']}개")
-        col2.metric("긍정", f"{sentiment_counts['긍정']}개")
-        col3.metric("보통", f"{sentiment_counts['보통']}개")
-        col4.metric("부정", f"{sentiment_counts['부정']}개")
-        col5.metric("매우 부정", f"{sentiment_counts['매우 부정']}개")
-        st.divider()
-        chart_type = st.radio(
-            "차트 종류 선택",
-            ["막대 그래프", "도넛형 차트"],
-            horizontal=True,
-            key="chart_type_expander",
-        )
-        fig = draw_sentiment_charts(df, chart_type)
-        st.plotly_chart(fig, width="stretch")
+    with st.expander("📊 감정 분포 시각화 및 통계", expanded=False):
+        with st.expander("감정별 리뷰 수", expanded=True):
+            sentiment_counts = calculate_sentiment_counts(df)
+            col1, col2, col3, col4, col5 = st.columns(5)
+            col1.metric("매우 긍정", f"{sentiment_counts['매우 긍정']}개")
+            col2.metric("긍정", f"{sentiment_counts['긍정']}개")
+            col3.metric("보통", f"{sentiment_counts['보통']}개")
+            col4.metric("부정", f"{sentiment_counts['부정']}개")
+            col5.metric("매우 부정", f"{sentiment_counts['매우 부정']}개")
+
+        with st.expander("감정 분포 차트", expanded=True):
+            chart_type = st.radio(
+                "차트 종류 선택",
+                ["막대 그래프", "도넛형 차트"],
+                horizontal=True,
+                key="chart_type_expander",
+            )
+            fig = draw_sentiment_charts(df, chart_type)
+            st.plotly_chart(fig, width="stretch")
 
 
 def render_timeline_section(df):
@@ -58,7 +60,16 @@ def render_timeline_section(df):
             key="timeline_period",
         )
 
-        timeline_df = prepare_timeline_data_by_period(df, period)
+        week_start = "월요일"
+        if period == "주별":
+            week_start = st.radio(
+                "주 시작 요일",
+                ["월요일", "일요일"],
+                horizontal=True,
+                key="timeline_week_start",
+            )
+
+        timeline_df = prepare_timeline_data_by_period(df, period, week_start=week_start)
 
         min_date = timeline_df["date"].min()
         max_date = timeline_df["date"].max()

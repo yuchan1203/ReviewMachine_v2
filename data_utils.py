@@ -3,7 +3,7 @@ import pandas as pd
 
 def calculate_sentiment_counts(df):
     """
-    감성 라벨별 개수를 딕셔너리로 반환합니다.
+    감정 라벨별 개수를 딕셔너리로 반환합니다.
     """
     labels = ["매우 긍정", "긍정", "보통", "부정", "매우 부정"]
     counts = {}
@@ -26,7 +26,7 @@ def prepare_timeline_data(df):
     return daily_df
 
 
-def prepare_timeline_data_by_period(df, period="일별"):
+def prepare_timeline_data_by_period(df, period="일별", week_start="월요일"):
     """
     사용자가 선택한 기간(일별/주별/월별) 기준의 감정 점수 추이 데이터를 생성합니다.
     주별/월별은 일별 점수 총합을 기준으로 다시 합산합니다.
@@ -35,7 +35,8 @@ def prepare_timeline_data_by_period(df, period="일별"):
 
     if period == "주별":
         weekly_df = daily_df.copy()
-        weekly_df["date"] = weekly_df["date"].dt.to_period("W").dt.start_time
+        week_period = "W-SUN" if week_start == "월요일" else "W-SAT"
+        weekly_df["date"] = weekly_df["date"].dt.to_period(week_period).dt.start_time
         return weekly_df.groupby("date", as_index=False)["sentiment_score"].sum()
 
     if period == "월별":
