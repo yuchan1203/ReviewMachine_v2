@@ -2,6 +2,10 @@ import streamlit as st
 import pandas as pd
 from app_scraper import get_reviews
 from analyzer import ReviewAnalyzer
+import plotly.express as px
+import warnings
+
+warnings.filterwarnings("ignore", category=UserWarning, module="transformers") # 특정 경고 메시지들을 숨김 처리
 
 # 페이지 설정
 st.set_page_config(page_title="ReviewMachine v2", layout="wide")
@@ -92,12 +96,53 @@ if analyze_button:
         col5.metric("매우 부정", f"{v_neg}개")
 
         # 5. 차트 표시
-        st.subheader("감성 분포")
-        st.bar_chart(df['sentiment'].value_counts())
+        st.subheader("📊 감성 분포 시각화")
+
+        # 1. 사용자 차트 선택 (라디오 버튼)
+        chart_type = st.radio("차트 종류 선택", ["막대 그래프", "도넛형 차트"], horizontal=True)
+
+        # 2. 순서 및 색상 정의
+        sentiment_order = ['매우 부정', '부정', '보통', '긍정', '매우 긍정']
+        # 요청하신 색상: 빨강(매우부정), 주황(부정), 노랑(보통), 초록(긍정), 파랑(매우긍정)
+        color_map = {
+            '매우 부정': '#FF4B4B', # 빨강
+            '부정': '#FFA500',      # 주황
+            '보통': '#FFFF00',      # 노랑
+            '긍정': '#00FF00',      # 초록
+            '매우 긍정': '#0000FF'   # 파랑
+        }
+
+        # 3. 데이터 집계
+        chart_data = df['sentiment'].value_counts().reindex(sentiment_order, fill_value=0).reset_index()
+        chart_data.columns = ['감성', '개수']
+
+        # 4. 차트 생성
+        if chart_type == "막대 그래프":
+            fig = px.bar(
+                chart_data, 
+                x='감성', 
+                y='개수', 
+                color='감성',
+                color_discrete_map=color_map,
+                category_orders={'감성': sentiment_order}
+            )
+        else:
+            fig = px.pie(
+                chart_data, 
+                names='감성', 
+                values='개수', 
+                color='감성',
+                color_discrete_map=color_map,
+                hole=0.5, # 도넛 형태를 만드는 구멍 크기
+                category_orders={'감성': sentiment_order}
+            )
+
+        # 차트 출력
+        st.plotly_chart(fig, width='stretch')
 
         # 6. 데이터 표 표시
         st.subheader("상세 리뷰 분석 결과")
-        st.dataframe(df, use_container_width=True)
+        st.dataframe(df, width='stretch')
 
         # 7. 다운로드 버튼
         csv = df.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig')
@@ -108,3 +153,4 @@ if analyze_button:
             mime="text/csv",
         )
         st.success("데이터 분석이 완료되었습니다!")
+
