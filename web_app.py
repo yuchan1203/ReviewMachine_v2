@@ -15,8 +15,8 @@ os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 import pandas as pd
 from app_scraper import get_reviews
 from analyzer import ReviewAnalyzer
-import plotly.express as px
 from visualizer import draw_sentiment_charts
+from data_utils import calculate_sentiment_counts, prepare_timeline_data
 
 
 # B. 사전 설정 및 화면 설정
@@ -83,51 +83,44 @@ if analyze_button:
 
 # D. 결과 출력 로직
 if st.session_state.analyzed_df is not None:
+
     # D-1. 세션에서 데이터 복구
     df = st.session_state.analyzed_df
     current_app_id = st.session_state.current_app_id
 
-    # D-2. 감정 순서 고정을 위한 설정
-    sentiment_order = ['매우 부정', '부정', '보통', '긍정', '매우 긍정']
+    # D-2. 감정 분포 차트
+    with st.expander("📊 감성 분포 시각화 및 통계", expanded=False):
+        sentiment_counts = calculate_sentiment_counts(df)
+        col1, col2, col3, col4, col5 = st.columns(5)
+        col1.metric("매우 긍정", f"{sentiment_counts['매우 긍정']}개")
+        col2.metric("긍정", f"{sentiment_counts['긍정']}개")
+        col3.metric("보통", f"{sentiment_counts['보통']}개")
+        col4.metric("부정", f"{sentiment_counts['부정']}개")
+        col5.metric("매우 부정", f"{sentiment_counts['매우 부정']}개")
+        st.divider()
+        chart_type = st.radio(
+            "차트 종류 선택",
+            ["막대 그래프", "도넛형 차트"],
+            horizontal=True,
+            key="chart_type_expander",
+        )
+        fig = draw_sentiment_charts(df, chart_type)
+        st.plotly_chart(fig, width='stretch')
 
-    # D-3. 시계열 그래프
-    st.subheader("📈 시간 흐름에 따른 감정 점수 추이")
-    df['at'] = pd.to_datetime(df['at'])
-    df['date'] = df['at'].dt.date
-    timeline_df = df.groupby('date')['sentiment_score'].mean().reset_index()
-    st.line_chart(data=timeline_df, x='date', y='sentiment_score')
-    st.info("💡 위 그래프가 0보다 위에 있으면 긍정적, 아래에 있으면 부정적인 여론이 강했음을 의미합니다.")
+    # D-3. 시간 흐름 그래프
+    with st.expander("📈 시간 흐름에 따른 감정 점수 추이", expanded=True):
+        timeline_df = prepare_timeline_data(df)
+        st.line_chart(data=timeline_df, x="date", y="sentiment_score")
+        st.info("💡 0보다 위면 긍정, 아래면 부정적인 여론을 의미합니다.")
 
-    # D-4. 요약 지표 (Metric)
-    col1, col2, col3, col4, col5 = st.columns(5)
-    v_pos = len(df[df['sentiment'] == '매우 긍정'])
-    pos = len(df[df['sentiment'] == '긍정'])
-    neu = len(df[df['sentiment'] == '보통'])
-    neg = len(df[df['sentiment'] == '부정'])
-    v_neg = len(df[df['sentiment'] == '매우 부정'])
-
-    col1.metric("매우 긍정", f"{v_pos}개")
-    col2.metric("긍정", f"{pos}개")
-    col3.metric("보통", f"{neu}개")
-    col4.metric("부정", f"{neg}개")
-    col5.metric("매우 부정", f"{v_neg}개")
-
-    # D-5. 차트 시각화 섹션
-    st.subheader("📊 감성 분포 시각화")
-    chart_type = st.radio("차트 종류 선택", ["막대 그래프", "도넛형 차트"], horizontal=True)
-    
-    # D-6. 분리한 모듈 호출
-    fig = draw_sentiment_charts(df, chart_type)
-    st.plotly_chart(fig, width='stretch')
-
-    # D-7. 상세 데이터 및 다운로드
-    st.subheader("상세 리뷰 분석 결과")
-    st.dataframe(df, width='stretch')
-
-    csv = df.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig')
-    st.download_button(
-        label="분석 결과가 포함된 CSV 다운로드",
-        data=csv,
-        file_name=f"analyzed_{current_app_id}.csv",
-        mime="text/csv",
-    )
+    # D-4. 상세 데이터 및 다운로드
+    with st.expander("📄 상세 리뷰 데이터 및 내보내기", expanded=False):
+        st.dataframe(df, width='stretch')
+        
+        csv = df.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig')
+        st.download_button(
+            label="분석 결과 CSV 다운로드",
+            data=csv,
+            file_name=f"analyzed_{current_app_id}.csv",
+            mime="text/csv",
+        )
