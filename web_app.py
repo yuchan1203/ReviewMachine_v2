@@ -1,19 +1,32 @@
+# 화면 설정 관련 모듈
 import streamlit as st
+
+# 경고 무시 및 로거 조절
+import warnings
+import os
+warnings.filterwarnings("ignore")
+from transformers import logging
+logging.set_verbosity_error() # 에러 수준이 아니면 출력하지 않음
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+
+# 데이터 처리 관련 모듈 
 import pandas as pd
 from app_scraper import get_reviews
 from analyzer import ReviewAnalyzer
 import plotly.express as px
-import warnings
 
-warnings.filterwarnings("ignore", category=UserWarning, module="transformers") # 특정 경고 메시지들을 숨김 처리
+# 분석 결과 저장
+if 'analyzed_df' not in st.session_state:
+    st.session_state.analyzed_df = None
+if 'current_app_id' not in st.session_state:
+    st.session_state.current_app_id = ""
 
-# 페이지 설정
+# 화면 설정
 st.set_page_config(page_title="ReviewMachine v2", layout="wide")
-
 st.title("📊 ReviewMachine v2: 앱 리뷰 감성 분석기")
 st.markdown("구글 플레이 스토어의 앱 ID를 입력하여 실시간 리뷰 분석 결과를 확인하세요.")
 
-# --- 사이드바 설정 영역 ---
+# 사이드바 설정
 with st.sidebar:
     st.header("입력 방식 선택")
     menu = st.radio("데이터 소스", ["실시간 크롤링", "CSV 파일 업로드"])
@@ -31,22 +44,21 @@ with st.sidebar:
 
     analyze_button = st.button("분석 시작")
 
-# --- 메인 분석 로직 영역 ---
+# 메인 분석 로직
 if analyze_button:
     df = None
 
     with st.spinner('데이터를 준비 중입니다...'):
-        # 1. 데이터 소스 확보
+        # 데이터 소스 확보
         if menu == "실시간 크롤링":
             df = get_reviews(app_id, count=review_count)
             is_already_analyzed = False
         elif menu == "CSV 파일 업로드" and uploaded_file is not None:
             df = pd.read_csv(uploaded_file)
-            # 이미 분석된 파일인지 확인 (핵심 컬럼 존재 여부 체크)
             is_already_analyzed = all(col in df.columns for col in ['sentiment', 'sentiment_score', 'confidence'])
 
         if df is not None:
-            # 2. 분석 단계: 이미 분석된 파일이 아니라면 AI 엔진 가동
+            # 분석 단계: 이미 분석된 파일이 아니라면 AI 엔진 가동
             if not is_already_analyzed:
                 with st.spinner('AI 감정 분석 중...'):
                     analyzer = ReviewAnalyzer()
@@ -56,101 +68,71 @@ if analyze_button:
                     df['sentiment'] = [r['sentiment'] for r in analysis_results]
                     df['sentiment_score'] = [r['sentiment_score'] for r in analysis_results]
                     df['confidence'] = [r['confidence'] for r in analysis_results]
-            else:
-                st.success("이미 분석된 파일입니다. 저장된 데이터를 불러옵니다.")
+            # 분석 완료 후 세션 상태에 저장
+            st.session_state.analyzed_df = df
+            st.session_state.current_app_id = app_id
+            st.success("데이터 분석이 완료되었습니다!")
 
-        # --- 추가되는 시계열 분석 로직 ---
-        st.subheader("📈 시간 흐름에 따른 감성 추이")
+# --- [2] 결과 출력 로직 (세션에 데이터가 있으면 무조건 표시) ---
+if st.session_state.analyzed_df is not None:
+    # 세션에서 데이터 복구
+    df = st.session_state.analyzed_df
+    current_app_id = st.session_state.current_app_id
 
-        # 순서 고정을 위한 설정
-        sentiment_order = ['매우 부정', '부정', '보통', '긍정', '매우 긍정']
-        sentiment_counts = df['sentiment'].value_counts().reindex(sentiment_order, fill_value=0)
+    # 감정 순서 고정을 위한 설정
+    sentiment_order = ['매우 부정', '부정', '보통', '긍정', '매우 긍정']
 
-        # 막대 그래프 출력
-        st.bar_chart(sentiment_counts)
+    # 1. 시계열 그래프
+    st.subheader("📈 시간 흐름에 따른 감정 점수 추이")
+    df['at'] = pd.to_datetime(df['at'])
+    df['date'] = df['at'].dt.date
+    timeline_df = df.groupby('date')['sentiment_score'].mean().reset_index()
+    st.line_chart(data=timeline_df, x='date', y='sentiment_score')
+    st.info("💡 위 그래프가 0보다 위에 있으면 긍정적, 아래에 있으면 부정적인 여론이 강했음을 의미합니다.")
 
-        # 시계열 그래프 (기존 점수 체계 유지)
-        st.subheader("📈 시간 흐름에 따른 감성 점수 추이")
-        df['at'] = pd.to_datetime(df['at'])
-        df['date'] = df['at'].dt.date
-        timeline_df = df.groupby('date')['sentiment_score'].mean().reset_index()
-        st.line_chart(data=timeline_df, x='date', y='sentiment_score')
-        
-        st.info("💡 위 그래프가 0보다 위에 있으면 긍정적, 아래에 있으면 부정적인 여론이 강했음을 의미합니다.")
+    # 2. 요약 지표 (Metric)
+    col1, col2, col3, col4, col5 = st.columns(5)
+    v_pos = len(df[df['sentiment'] == '매우 긍정'])
+    pos = len(df[df['sentiment'] == '긍정'])
+    neu = len(df[df['sentiment'] == '보통'])
+    neg = len(df[df['sentiment'] == '부정'])
+    v_neg = len(df[df['sentiment'] == '매우 부정'])
 
-        # 4. 결과 시각화 - 요약 통계 (5개 컬럼으로 확장)
-        col1, col2, col3, col4, col5 = st.columns(5)
-        
-        # 각 상태별 개수 계산
-        v_pos = len(df[df['sentiment'] == '매우 긍정'])
-        pos = len(df[df['sentiment'] == '긍정'])
-        neu = len(df[df['sentiment'] == '보통'])
-        neg = len(df[df['sentiment'] == '부정'])
-        v_neg = len(df[df['sentiment'] == '매우 부정'])
+    col1.metric("매우 긍정", f"{v_pos}개")
+    col2.metric("긍정", f"{pos}개")
+    col3.metric("보통", f"{neu}개")
+    col4.metric("부정", f"{neg}개")
+    col5.metric("매우 부정", f"{v_neg}개")
 
-        # 메트릭 표시
-        col1.metric("매우 긍정", f"{v_pos}개")
-        col2.metric("긍정", f"{pos}개")
-        col3.metric("보통", f"{neu}개")
-        col4.metric("부정", f"{neg}개")
-        col5.metric("매우 부정", f"{v_neg}개")
+    # 3. 차트 시각화 섹션
+    st.subheader("📊 감성 분포 시각화")
+    chart_type = st.radio("차트 종류 선택", ["막대 그래프", "도넛형 차트"], horizontal=True)
 
-        # 5. 차트 표시
-        st.subheader("📊 감성 분포 시각화")
+    color_map = {
+        '매우 부정': '#FF4B4B', '부정': '#FFA500', '보통': '#FFFF00',
+        '긍정': '#00FF00', '매우 긍정': '#0000FF'
+    }
 
-        # 1. 사용자 차트 선택 (라디오 버튼)
-        chart_type = st.radio("차트 종류 선택", ["막대 그래프", "도넛형 차트"], horizontal=True)
+    chart_data = df['sentiment'].value_counts().reindex(sentiment_order, fill_value=0).reset_index()
+    chart_data.columns = ['감성', '개수']
 
-        # 2. 순서 및 색상 정의
-        sentiment_order = ['매우 부정', '부정', '보통', '긍정', '매우 긍정']
-        # 요청하신 색상: 빨강(매우부정), 주황(부정), 노랑(보통), 초록(긍정), 파랑(매우긍정)
-        color_map = {
-            '매우 부정': '#FF4B4B', # 빨강
-            '부정': '#FFA500',      # 주황
-            '보통': '#FFFF00',      # 노랑
-            '긍정': '#00FF00',      # 초록
-            '매우 긍정': '#0000FF'   # 파랑
-        }
+    if chart_type == "막대 그래프":
+        fig = px.bar(chart_data, x='감성', y='개수', color='감성',
+                     color_discrete_map=color_map, category_orders={'감성': sentiment_order})
+    else:
+        fig = px.pie(chart_data, names='감성', values='개수', color='감성',
+                     color_discrete_map=color_map, hole=0.5, category_orders={'감성': sentiment_order})
 
-        # 3. 데이터 집계
-        chart_data = df['sentiment'].value_counts().reindex(sentiment_order, fill_value=0).reset_index()
-        chart_data.columns = ['감성', '개수']
+    st.plotly_chart(fig, width='stretch')
 
-        # 4. 차트 생성
-        if chart_type == "막대 그래프":
-            fig = px.bar(
-                chart_data, 
-                x='감성', 
-                y='개수', 
-                color='감성',
-                color_discrete_map=color_map,
-                category_orders={'감성': sentiment_order}
-            )
-        else:
-            fig = px.pie(
-                chart_data, 
-                names='감성', 
-                values='개수', 
-                color='감성',
-                color_discrete_map=color_map,
-                hole=0.5, # 도넛 형태를 만드는 구멍 크기
-                category_orders={'감성': sentiment_order}
-            )
+    # 4. 상세 데이터 및 다운로드
+    st.subheader("상세 리뷰 분석 결과")
+    st.dataframe(df, width='stretch')
 
-        # 차트 출력
-        st.plotly_chart(fig, width='stretch')
-
-        # 6. 데이터 표 표시
-        st.subheader("상세 리뷰 분석 결과")
-        st.dataframe(df, width='stretch')
-
-        # 7. 다운로드 버튼
-        csv = df.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig')
-        st.download_button(
-            label="분석 결과가 포함된 CSV 다운로드",
-            data=csv,
-            file_name=f"analyzed_{app_id}.csv",
-            mime="text/csv",
-        )
-        st.success("데이터 분석이 완료되었습니다!")
-
+    csv = df.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig')
+    st.download_button(
+        label="분석 결과가 포함된 CSV 다운로드",
+        data=csv,
+        file_name=f"analyzed_{current_app_id}.csv",
+        mime="text/csv",
+    )
