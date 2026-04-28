@@ -36,16 +36,15 @@ def validate_input_dataframe(df):
 
 
 def load_source_dataframe(
-    menu, app_id, review_count, start_date, end_date, uploaded_file, sample_mode="latest"
+    menu, app_id, review_count, start_date, end_date, uploaded_file, crawl_mode="count_latest", period_days=None
 ):
     if menu == "실시간 크롤링":
         try:
             df = get_reviews(
                 app_id,
                 count=review_count,
-                start_date=start_date,
-                end_date=end_date,
-                sample_mode=sample_mode,
+                crawl_mode=crawl_mode,
+                period_days=period_days,
             )
         except Exception as exc:
             raise ReviewPipelineError(
