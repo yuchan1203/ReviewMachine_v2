@@ -1,7 +1,8 @@
 import pandas as pd
+import streamlit as st
 
 from app_scraper import get_reviews
-from analyzer import ReviewAnalyzer
+from analyzer import get_review_analyzer
 
 
 ANALYZED_COLUMNS = ["sentiment", "sentiment_score", "confidence"]
@@ -35,6 +36,7 @@ def validate_input_dataframe(df):
         raise ReviewPipelineError("리뷰 본문(content)에 분석 가능한 텍스트가 없습니다.")
 
 
+@st.cache_data(show_spinner=False)
 def load_source_dataframe(
     menu, app_id, review_count, start_date, end_date, uploaded_file, crawl_mode="count_latest", period_days=None
 ):
@@ -66,7 +68,9 @@ def load_source_dataframe(
 
 def run_sentiment_analysis(df, progress_callback=None, batch_size=32, device="cpu", return_runtime_info=False):
     validate_input_dataframe(df)
-    analyzer = ReviewAnalyzer(device=device)
+    
+    # 캐시된 analyzer 사용 - 재시작 시 모델 다시 로드 안 함
+    analyzer = get_review_analyzer(device=device)
     texts = df["content"].fillna("").astype(str).tolist()
     total = len(texts)
     analysis_results = []

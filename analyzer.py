@@ -1,16 +1,32 @@
+import streamlit as st
 from transformers import pipeline
 
 
+@st.cache_resource(show_spinner=False)
+def get_review_analyzer(device="cpu"):
+    """ReviewAnalyzer 인스턴스를 캐시하여 재시작 시 모델을 다시 로드하지 않음"""
+    return ReviewAnalyzer(device=device)
+
+
 class ReviewAnalyzer:
-    def __init__(self, device="cpu"):
+    def __init__(self, device="cpu", mode="transformers"):
         # GPU/CPU 디바이스 설정
         device_map = 0 if device != "cpu" else -1
+        self.mode = mode
+        self.device = device
         
         self.model = pipeline(
             "sentiment-analysis", 
             model="jaehyeong/koelectra-base-v3-generalized-sentiment-analysis",
             device=device_map
         )
+
+    def runtime_info(self):
+        return {
+            "requested_device": self.device,
+            "actual_device": "GPU" if self.device != "cpu" else "CPU",
+            "model_mode": self.mode
+        }
 
     def _refine_sentiment(self, result):
         """제안해주신 대칭적 5단계 분류 로직"""
@@ -53,9 +69,9 @@ class ReviewAnalyzer:
         refined = []
         for res in raw_results:
             sentiment_text, sentiment_score = self._refine_sentiment(res)
-            refined_data.append({
+            refined.append({
                 'sentiment': sentiment_text,
                 'sentiment_score': sentiment_score,
                 'confidence': round(res['score'], 2)
             })
-        return refined_data
+        return refined
