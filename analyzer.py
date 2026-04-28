@@ -2,11 +2,14 @@ from transformers import pipeline
 
 
 class ReviewAnalyzer:
-    def __init__(self):
-        # 모델 로드 (이전과 동일)
+    def __init__(self, device="cpu"):
+        # GPU/CPU 디바이스 설정
+        device_map = 0 if device != "cpu" else -1
+        
         self.model = pipeline(
             "sentiment-analysis", 
-            model="jaehyeong/koelectra-base-v3-generalized-sentiment-analysis"
+            model="jaehyeong/koelectra-base-v3-generalized-sentiment-analysis",
+            device=device_map
         )
 
     def _refine_sentiment(self, result):
