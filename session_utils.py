@@ -1,6 +1,7 @@
+# A. 모듈 임포트
 import streamlit as st
 
-
+# B. 세션 상태 초기화 함수 정의
 def initialize_session_state():
     if "analyzed_df" not in st.session_state:
         st.session_state.analyzed_df = None

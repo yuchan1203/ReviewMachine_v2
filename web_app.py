@@ -83,13 +83,13 @@ def render_main_menu():
     with col1:
         st.markdown("### 📁 파일 업로드")
         st.markdown("이미 수집된 CSV 파일을 업로드하여 분석합니다.")
-        if st.button("📂 파일 업로드로 이동", key="btn_file_upload", use_container_width=True):
+        if st.button("📂 파일 업로드로 이동", key="btn_file_upload", width='stretch'):
             navigate_to("file_upload")
     
     with col2:
         st.markdown("### 🔄 새로 시작하기")
         st.markdown("새로운 앱 리뷰를 크롤링하여 분석을 시작합니다.")
-        if st.button("🚀 새로 시작하기", key="btn_new_start", use_container_width=True):
+        if st.button("🚀 새로 시작하기", key="btn_new_start", width='stretch'):
             navigate_to("new_start")
 
 
@@ -134,7 +134,7 @@ def render_new_start():
     
     # 3. 버튼을 눌러 크롤링 시작
     st.markdown("### 3️⃣ 크롤링 시작")
-    if st.button("🔥 크롤링 시작", type="primary", key="btn_start_crawl", use_container_width=True):
+    if st.button("🔥 크롤링 시작", type="primary", key="btn_start_crawl", width='stretch'):
         try:
             crawl_progress = _render_crawl_progress()
             df, is_already_analyzed = load_source_dataframe(
@@ -165,7 +165,7 @@ def render_new_start():
             st.code("".join(traceback.format_exception(type(exc), exc, exc.__traceback__)))
     
     st.markdown("---")
-    if st.button("↩ 메인으로", key="btn_back_main", use_container_width=True):
+    if st.button("↩ 메인으로", key="btn_back_main", width='stretch'):
         navigate_to("main")
 
 
@@ -234,7 +234,7 @@ def render_file_upload():
             st.session_state.uploaded_file_data = None
     
     st.markdown("---")
-    if st.button("↩ 메인으로", key="btn_back_main2", use_container_width=True):
+    if st.button("↩ 메인으로", key="btn_back_main2", width='stretch'):
         st.session_state.uploaded_file_data = None
         navigate_to("main")
 
@@ -251,7 +251,7 @@ def render_continue_analysis():
     if source_df is None:
         st.error("크롤링 데이터가 없습니다. 다시 시작해주세요.")
         st.markdown("---")
-        if st.button("↩ 메인으로", key="btn_back_main3", use_container_width=True):
+        if st.button("↩ 메인으로", key="btn_back_main3", width='stretch'):
             navigate_to("main")
         return
     
@@ -260,7 +260,7 @@ def render_continue_analysis():
     
     # 크롤링 데이터 표시
     st.subheader("1단계 완료: 크롤링 데이터")
-    st.dataframe(source_df.head(10), use_container_width=True)
+    st.dataframe(source_df.head(10), width='stretch')
     st.caption(f"총 {len(source_df)}개의 리뷰")
     
     raw_csv = source_df.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
@@ -278,7 +278,7 @@ def render_continue_analysis():
     analysis_device_label = st.selectbox("분석 장치", ["CPU", "GPU"], key="analysis_device")
     
     # 2. 분석 시작
-    if st.button("🔍 분석 시작", type="primary", key="btn_start_analysis", use_container_width=True):
+    if st.button("🔍 분석 시작", type="primary", key="btn_start_analysis", width='stretch'):
         try:
             requested_device = "gpu" if analysis_device_label == "GPU" else "cpu"
             actual_device = _resolve_actual_device(requested_device)
@@ -305,7 +305,7 @@ def render_continue_analysis():
             st.code("".join(traceback.format_exception(type(exc), exc, exc.__traceback__)))
     
     st.markdown("---")
-    if st.button("↩ 메인으로", key="btn_back_main3", use_container_width=True):
+    if st.button("↩ 메인으로", key="btn_back_main3", width='stretch'):
         navigate_to("main")
 
 
@@ -322,7 +322,7 @@ def render_result():
     if df is None:
         st.error("분석 결과가 없습니다. 다시 시작해주세요.")
         st.markdown("---")
-        if st.button("🔄 처음부터 다시 시작", key="btn_back_main4", use_container_width=True):
+        if st.button("🔄 처음부터 다시 시작", key="btn_back_main4", width='stretch'):
             reset_all_state()
         return
     
@@ -342,7 +342,7 @@ def render_result():
     render_detail_section(df, current_app_id)
     
     st.markdown("---")
-    if st.button("🔄 처음부터 다시 시작", key="btn_back_main4", use_container_width=True):
+    if st.button("🔄 처음부터 다시 시작", key="btn_back_main4", width='stretch'):
         reset_all_state()
 
 

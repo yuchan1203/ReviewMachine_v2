@@ -1,13 +1,22 @@
+# A. 모듈 임포트
 from datetime import date, timedelta
-
 from google_play_scraper import Sort, reviews
 import pandas as pd
+import streamlit as st
 
 
+# B. Streamlit 캐시 데코레이터 및 예외 정의
+@st.cache_data(show_spinner=False)
+
+
+# C. 리뷰 수집 함수 정의
 def _get_reviews_latest(app_id, safe_count):
+
+    # C-1. 리뷰를 배치로 수집하여 안전하게 최대 개수까지 수집
     collected = []
     continuation_token = None
 
+    # C-2. 리뷰 수집 루프: 배치 단위로 리뷰를 수집하고, 수집된 리뷰가 안전한 최대 개수에 도달할 때까지 반복
     while len(collected) < safe_count:
         batch_size = min(200, safe_count - len(collected))
         result, continuation_token = reviews(
@@ -18,10 +27,8 @@ def _get_reviews_latest(app_id, safe_count):
             count=batch_size,
             continuation_token=continuation_token,
         )
-
         if not result:
             break
-
         for review in result:
             review_date = pd.to_datetime(review.get("at"), errors="coerce")
             if pd.isna(review_date):
@@ -29,17 +36,19 @@ def _get_reviews_latest(app_id, safe_count):
             collected.append(review)
             if len(collected) >= safe_count:
                 break
-
         if continuation_token is None:
             break
-
     return collected
 
 
+# D. 특정 기간 내 리뷰 수집 함수 정의
 def _get_reviews_since(app_id, start_date):
+
+    # D-1. 리뷰를 배치로 수집하여 시작 날짜 이후의 리뷰만 수집
     collected = []
     continuation_token = None
 
+    # D-2. 리뷰 수집 루프: 배치 단위로 리뷰를 수집하고, 수집된 리뷰의 날짜가 시작 날짜 이후인 경우에만 수집
     while True:
         result, continuation_token = reviews(
             app_id,
@@ -49,10 +58,8 @@ def _get_reviews_since(app_id, start_date):
             count=200,
             continuation_token=continuation_token,
         )
-
         if not result:
             break
-
         batch_oldest = None
         for review in result:
             review_date = pd.to_datetime(review.get("at"), errors="coerce")
@@ -63,28 +70,24 @@ def _get_reviews_since(app_id, start_date):
                 batch_oldest = d
             if d >= start_date:
                 collected.append(review)
-
         if continuation_token is None:
             break
         if batch_oldest is not None and batch_oldest < start_date:
             break
-
     return collected
 
 
+# E. 리뷰 분석기 캐싱 함수 정의
 def get_reviews(
+        
+    # E-1. 앱 ID와 수집 옵션을 받아 리뷰를 수집하는 함수 정의
     app_id,
     count=100,
     crawl_mode="count_latest",
     period_days=None,
 ):
-    """
-    특정 앱의 ID를 입력받아 리뷰를 수집하고 데이터프레임으로 변환합니다.
-
-    crawl_mode:
-      - "count_latest": 최신순에서 count개 수집
-      - "period_all": 오늘 기준 period_days 이내 리뷰 전체 수집
-    """
+    
+    # E-2. 수집 모드에 따라 리뷰를 수집하는 함수 호출
     if crawl_mode == "period_all":
         safe_days = max(1, int(period_days or 1))
         start_date = date.today() - timedelta(days=safe_days)
@@ -92,20 +95,14 @@ def get_reviews(
     else:
         safe_count = max(1, min(10000, int(count)))
         collected = _get_reviews_latest(app_id, safe_count)
-
+    
+    # E-3. 수집된 리뷰를 데이터프레임으로 변환하고, 날짜 형식으로 변환하여 정렬
     df = pd.DataFrame(collected)
+
+    # E-4. 리뷰 데이터가 없는 경우 빈 데이터프레임 반환, 날짜 형식으로 변환하여 정렬
     if df.empty:
         return pd.DataFrame(columns=["at", "userName", "score", "content"])
-
     df = df[["at", "userName", "score", "content"]]
     df["at"] = pd.to_datetime(df["at"], errors="coerce")
     df = df.sort_values("at", ascending=True, na_position="last").reset_index(drop=True)
-
     return df
-
-if __name__ == "__main__":
-    # 코드가 잘 작동하는지 테스트하기 위한 구간입니다.
-    # 테스트용 앱 ID: 'com.kakao.talk' (카카오톡)
-    print("데이터 수집 중...")
-    test_df = get_reviews('com.kakao.talk', count=10)
-    print(test_df)

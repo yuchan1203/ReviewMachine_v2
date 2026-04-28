@@ -1,13 +1,19 @@
+# A. 모듈 임포트
+
+# A-1. 표준 라이브러리
 from datetime import datetime
 
+# A-2. 서드파티 라이브러리
 import pandas as pd
 import plotly.express as px
 import streamlit as st
 
+# A-3. 프로젝트 내부 모듈
 from data_utils import calculate_sentiment_counts, prepare_timeline_data_by_period
 from visualizer import draw_sentiment_charts
 
 
+# B. UI 섹션별 렌더링 함수 정의
 def render_file_info_section(df, current_app_id):
     with st.expander("📄 CSV 파일 및 데이터 정보", expanded=True):
         info_df = df.copy()
@@ -29,6 +35,7 @@ def render_file_info_section(df, current_app_id):
             st.write(f"**⏰ 조회/생성 일시:** {current_time}")
 
 
+# C. 감정 분석 결과 시각화 섹션 렌더링 함수 정의
 def render_sentiment_section(df):
     with st.expander("📊 감정 분포 시각화 및 통계", expanded=False):
         with st.expander("감정별 리뷰 수", expanded=True):
@@ -51,6 +58,7 @@ def render_sentiment_section(df):
             st.plotly_chart(fig, width="stretch")
 
 
+# D. 시간 흐름에 따른 감정 점수 추이 섹션 렌더링 함수 정의
 def render_timeline_section(df):
     with st.expander("📈 시간 흐름에 따른 감정 점수 추이", expanded=True):
         period = st.radio(
@@ -86,6 +94,7 @@ def render_timeline_section(df):
         st.info("💡 0보다 위면 긍정, 아래면 부정적인 여론을 의미합니다.")
 
 
+# E. 상세 리뷰 데이터 섹션 렌더링 함수 정의
 def render_detail_section(df, current_app_id):
     with st.expander("📄 상세 리뷰 데이터 및 내보내기", expanded=False):
         st.dataframe(df, width="stretch")
