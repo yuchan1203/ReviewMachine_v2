@@ -1,63 +1,14 @@
-import random
-from datetime import date
+from datetime import date, timedelta
 
 from google_play_scraper import Sort, reviews
 import pandas as pd
 
 
-def _month_keys_inclusive(start_date: date, end_date: date):
-    keys = []
-    y, m = start_date.year, start_date.month
-    while (y, m) <= (end_date.year, end_date.month):
-        keys.append((y, m))
-        if m == 12:
-            y, m = y + 1, 1
-        else:
-            m += 1
-    return keys
-
-
-def _allocate_per_month(total: int, month_keys: list):
-    n = len(month_keys)
-    if n == 0:
-        return {}
-    base = total // n
-    rem = total % n
-    return {month_keys[i]: base + (1 if i < rem else 0) for i in range(n)}
-
-
-def _reservoir_offer(reservoir: list, k: int, item: dict, seen: int) -> int:
-    """Vitter: 무한 스트림에서 균등하게 k개 표본을 고르는 1-pass 리저버."""
-    seen += 1
-    if k <= 0:
-        return seen
-    if len(reservoir) < k:
-        reservoir.append(item)
-    else:
-        j = random.randint(1, seen)
-        if j <= k:
-            reservoir[j - 1] = item
-    return seen
-
-
-def _review_in_window(review, start_date, end_date):
-    review_date = pd.to_datetime(review.get("at"), errors="coerce")
-    if pd.isna(review_date):
-        return None
-    d = review_date.date()
-    if end_date is not None and d > end_date:
-        return None
-    if start_date is not None and d < start_date:
-        return None
-    return d
-
-
-def _get_reviews_latest(app_id, safe_count, start_date, end_date):
+def _get_reviews_latest(app_id, safe_count):
     collected = []
     continuation_token = None
-    reached_before_start = False
 
-    while len(collected) < safe_count and not reached_before_start:
+    while len(collected) < safe_count:
         batch_size = min(200, safe_count - len(collected))
         result, continuation_token = reviews(
             app_id,
@@ -75,13 +26,6 @@ def _get_reviews_latest(app_id, safe_count, start_date, end_date):
             review_date = pd.to_datetime(review.get("at"), errors="coerce")
             if pd.isna(review_date):
                 continue
-            d = review_date.date()
-            if end_date is not None and d > end_date:
-                continue
-            if start_date is not None and d < start_date:
-                reached_before_start = True
-                continue
-
             collected.append(review)
             if len(collected) >= safe_count:
                 break
@@ -92,12 +36,8 @@ def _get_reviews_latest(app_id, safe_count, start_date, end_date):
     return collected
 
 
-def _get_reviews_even_monthly(app_id, safe_count, start_date, end_date):
-    month_keys = _month_keys_inclusive(start_date, end_date)
-    quotas = _allocate_per_month(safe_count, month_keys)
-    reservoirs = {k: [] for k in month_keys}
-    seen_by_month = {k: 0 for k in month_keys}
-
+def _get_reviews_since(app_id, start_date):
+    collected = []
     continuation_token = None
 
     while True:
@@ -121,28 +61,13 @@ def _get_reviews_even_monthly(app_id, safe_count, start_date, end_date):
             d = review_date.date()
             if batch_oldest is None or d < batch_oldest:
                 batch_oldest = d
-
-            d = _review_in_window(review, start_date, end_date)
-            if d is None:
-                continue
-
-            month_key = (d.year, d.month)
-            q = quotas.get(month_key, 0)
-            if q <= 0:
-                continue
-
-            seen_by_month[month_key] = _reservoir_offer(
-                reservoirs[month_key], q, review, seen_by_month[month_key]
-            )
+            if d >= start_date:
+                collected.append(review)
 
         if continuation_token is None:
             break
-        if start_date is not None and batch_oldest is not None and batch_oldest < start_date:
+        if batch_oldest is not None and batch_oldest < start_date:
             break
-
-    collected = []
-    for mk in month_keys:
-        collected.extend(reservoirs[mk])
 
     return collected
 
@@ -150,34 +75,23 @@ def _get_reviews_even_monthly(app_id, safe_count, start_date, end_date):
 def get_reviews(
     app_id,
     count=100,
-    start_date=None,
-    end_date=None,
-    sample_mode="latest",
+    crawl_mode="count_latest",
+    period_days=None,
 ):
     """
     특정 앱의 ID를 입력받아 리뷰를 수집하고 데이터프레임으로 변환합니다.
 
-    sample_mode:
-      - "latest": 기간 내에서 최신순으로 count개까지
-      - "even_monthly": 기간을 월 단위로 나누고, 각 월에 count를 균등 배분한 뒤
-        해당 월 리뷰 스트림에서 무작위(리저버 샘플링)로 추출
+    crawl_mode:
+      - "count_latest": 최신순에서 count개 수집
+      - "period_all": 오늘 기준 period_days 이내 리뷰 전체 수집
     """
-    safe_count = int(count)
-    if safe_count < 1:
-        safe_count = 1
-    if safe_count > 10000:
-        safe_count = 10000
-
-    if sample_mode == "even_monthly":
-        if start_date is None or end_date is None:
-            sample_mode = "latest"
-        elif not _month_keys_inclusive(start_date, end_date):
-            return pd.DataFrame(columns=["at", "userName", "score", "content"])
-
-    if sample_mode == "even_monthly":
-        collected = _get_reviews_even_monthly(app_id, safe_count, start_date, end_date)
+    if crawl_mode == "period_all":
+        safe_days = max(1, int(period_days or 1))
+        start_date = date.today() - timedelta(days=safe_days)
+        collected = _get_reviews_since(app_id, start_date)
     else:
-        collected = _get_reviews_latest(app_id, safe_count, start_date, end_date)
+        safe_count = max(1, min(10000, int(count)))
+        collected = _get_reviews_latest(app_id, safe_count)
 
     df = pd.DataFrame(collected)
     if df.empty:

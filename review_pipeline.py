@@ -36,16 +36,15 @@ def validate_input_dataframe(df):
 
 
 def load_source_dataframe(
-    menu, app_id, review_count, start_date, end_date, uploaded_file, sample_mode="latest"
+    menu, app_id, review_count, start_date, end_date, uploaded_file, crawl_mode="count_latest", period_days=None
 ):
     if menu == "실시간 크롤링":
         try:
             df = get_reviews(
                 app_id,
                 count=review_count,
-                start_date=start_date,
-                end_date=end_date,
-                sample_mode=sample_mode,
+                crawl_mode=crawl_mode,
+                period_days=period_days,
             )
         except Exception as exc:
             raise ReviewPipelineError(
@@ -65,14 +64,16 @@ def load_source_dataframe(
     return None, False
 
 
-def run_sentiment_analysis(df, progress_callback=None, batch_size=32):
+def run_sentiment_analysis(df, progress_callback=None, batch_size=32, device="cpu", return_runtime_info=False):
     validate_input_dataframe(df)
-    analyzer = ReviewAnalyzer()
+    analyzer = ReviewAnalyzer(device=device)
     texts = df["content"].fillna("").astype(str).tolist()
     total = len(texts)
     analysis_results = []
 
     if total == 0:
+        if return_runtime_info:
+            return df, analyzer.runtime_info()
         return df
 
     safe_batch_size = max(1, int(batch_size))
@@ -86,4 +87,6 @@ def run_sentiment_analysis(df, progress_callback=None, batch_size=32):
     df["sentiment"] = [r["sentiment"] for r in analysis_results]
     df["sentiment_score"] = [r["sentiment_score"] for r in analysis_results]
     df["confidence"] = [r["confidence"] for r in analysis_results]
+    if return_runtime_info:
+        return df, analyzer.runtime_info()
     return df

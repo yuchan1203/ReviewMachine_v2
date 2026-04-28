@@ -12,3 +12,5 @@ def initialize_session_state():
         st.session_state.source_app_id = ""
     if "current_app_id" not in st.session_state:
         st.session_state.current_app_id = ""
+    if "analysis_runtime_info" not in st.session_state:
+        st.session_state.analysis_runtime_info = None
