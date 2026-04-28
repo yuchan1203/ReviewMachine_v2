@@ -1,3 +1,13 @@
+'''
+이 파일은 리뷰 데이터의 UI 섹션별 렌더링을 담당합니다.
+A. 모듈 임포트: 필요한 라이브러리 로딩
+B. 파일 정보 섹션: CSV 파일 및 데이터 정보 표시
+C. 감정 분석 결과 시각화 섹션: 감정 분포 차트 및 통계 표시
+D. 시간 흐름에 따른 감정 점수 추이 섹션: 라인 차트로 감정 점수 추이 시각화
+E. 상세 리뷰 데이터 섹션: 분석된 리뷰 데이터 테이블 및 CSV 다운로드 기능
+'''
+
+
 # A. 모듈 임포트
 
 # A-1. 표준 라이브러리
@@ -61,6 +71,7 @@ def render_sentiment_section(df):
 # D. 시간 흐름에 따른 감정 점수 추이 섹션 렌더링 함수 정의
 def render_timeline_section(df):
     with st.expander("📈 시간 흐름에 따른 감정 점수 추이", expanded=True):
+        # D-1. 집계 단위 선택 라디오 버튼
         period = st.radio(
             "집계 단위 선택",
             ["일별", "주별", "월별"],
@@ -68,6 +79,7 @@ def render_timeline_section(df):
             key="timeline_period",
         )
 
+        # D-2. 주별 집계 선택 시 주 시작 요일 선택 라디오 버튼
         week_start = "월요일"
         if period == "주별":
             week_start = st.radio(
@@ -77,11 +89,14 @@ def render_timeline_section(df):
                 key="timeline_week_start",
             )
 
+        # D-3. 감정 점수 추이 데이터 준비 및 시각화
         timeline_df = prepare_timeline_data_by_period(df, period, week_start=week_start)
 
+        # D-4. 날짜 범위 설정 및 라인 차트 생성
         min_date = timeline_df["date"].min()
         max_date = timeline_df["date"].max()
 
+        # D-5. 라인 차트 생성
         fig = px.line(
             timeline_df,
             x="date",
@@ -89,6 +104,8 @@ def render_timeline_section(df):
             markers=True,
             labels={"date": "날짜", "sentiment_score": f"{period} 감정 점수 합계"},
         )
+
+        # D-6. x축 범위 설정 및 차트 출력
         fig.update_xaxes(range=[min_date, max_date], rangeslider_visible=False)
         st.plotly_chart(fig, width="stretch")
         st.info("💡 0보다 위면 긍정, 아래면 부정적인 여론을 의미합니다.")

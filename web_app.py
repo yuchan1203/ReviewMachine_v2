@@ -1,11 +1,17 @@
+# A. 모델 임포트
+
+# A-1. 라이브러리 임포트
+import pandas as pd
 import os
 import traceback
 import warnings
 from datetime import date
 
+# A-2. 내부 모듈 임포트
 import streamlit as st
 from transformers import logging
 
+# A-3. 앱 모듈 임포트
 from review_pipeline import ReviewPipelineError, load_source_dataframe, run_sentiment_analysis
 from session_utils import initialize_session_state
 from ui_sections import (
@@ -15,23 +21,34 @@ from ui_sections import (
     render_timeline_section,
 )
 
+
+# B. 경고 무시 및 로깅 레벨 설정
 warnings.filterwarnings("ignore")
 logging.set_verbosity_error()
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
 
+# C. 예외 정의
 def _render_crawl_progress():
     progress = st.progress(0, text="데이터 크롤링 준비 중...")
     progress.progress(20, text="크롤링 대상 정보를 확인하고 있습니다...")
     return progress
 
+# D-1. 입력 데이터 검증 함수
+REQUIRED_COLUMNS = ["at", "content"]
+def validate_input_dataframe(df):
+    if df is None:
+        raise ReviewPipelineError("데이터를 불러오지 못했습니다.")
 
+
+# D-2. 분석 진행 상황 표시 함수
 def _render_analysis_progress(done, total, progress_bar):
     ratio = 0 if total == 0 else done / total
     percent = int(ratio * 100)
     progress_bar.progress(percent, text=f"리뷰 분석 진행 중... ({done}/{total})")
 
 
+# E. 실제 분석 장치 결정 함수
 def _resolve_actual_device(requested_device):
     if requested_device != "gpu":
         return "cpu"
@@ -45,22 +62,75 @@ def _resolve_actual_device(requested_device):
     return "cpu"
 
 
-# ============================================================
-# UX 상태 관리
-# ============================================================
+# F. 입력 데이터 검증 함수
+REQUIRED_COLUMNS = ["at", "content"]
+def validate_input_dataframe(df):
+    if df is None:
+        raise ReviewPipelineError("데이터를 불러오지 못했습니다.")
+
+
+# G. 데이터프레임이 비어있는지 확인
+def validate_non_empty_dataframe(df):
+    if df is None or df.empty:
+        raise ReviewPipelineError("데이터가 비어 있습니다.")
+
+
+# H. 네비게이션 상태 초기화
 def init_navigation_state():
-    """네비게이션 상태 초기화"""
     if "nav_state" not in st.session_state:
         st.session_state.nav_state = "main"
 
 
+# I. 입력 데이터 검증 함수 (통합)
+def validate_input_dataframe(df):
+    if df is None:
+        raise ReviewPipelineError("데이터를 불러오지 못했습니다.")
+    if df.empty:
+        raise ReviewPipelineError("리뷰 데이터가 비어 있습니다.")
+    missing_columns = [col for col in REQUIRED_COLUMNS if col not in df.columns]
+    if missing_columns:
+        raise ReviewPipelineError(
+            f"필수 컬럼이 없습니다: {', '.join(missing_columns)}. "
+            "CSV에 at, content 컬럼이 포함되어 있는지 확인해주세요."
+        )
+    non_empty_content = df["content"].astype(str).str.strip() != ""
+    if not non_empty_content.any():
+        raise ReviewPipelineError("리뷰 본문(content)에 분석 가능한 텍스트가 없습니다.")
+
+
+# J. 입력 데이터 검증 함수 (분리된 단계)
+def validate_input_dataframe(df):
+    # J-1. 데이터프레임이 None인지 확인
+    if df is None:
+        raise ReviewPipelineError("데이터를 불러오지 못했습니다.")
+    
+    # J-2. 데이터프레임이 비어있는지 확인
+    if df.empty:
+        raise ReviewPipelineError("리뷰 데이터가 비어 있습니다.")
+
+    # J-3. 필수 컬럼 존재 여부 확인
+    missing_columns = [col for col in REQUIRED_COLUMNS if col not in df.columns]
+    if missing_columns:
+        raise ReviewPipelineError(
+            f"필수 컬럼이 없습니다: {', '.join(missing_columns)}. "
+            "CSV에 at, content 컬럼이 포함되어 있는지 확인해주세요."
+        )
+    
+    # J-4. 리뷰 본문(content)에 분석 가능한 텍스트가 있는지 확인
+    non_empty_content = df["content"].astype(str).str.strip() != ""
+
+    # J-5. 분석 가능한 텍스트가 하나도 없는 경우 예외 발생
+    if not non_empty_content.any():
+        raise ReviewPipelineError("리뷰 본문(content)에 분석 가능한 텍스트가 없습니다.")
+    
+
+# K. 네비게이션 함수 및 상태 초기화
 def navigate_to(state):
-    """화면 이동"""
     st.session_state.nav_state = state
 
 
+# L. 모든 상태 초기화 함수
 def reset_all_state():
-    """모든 상태 초기화 - 처음부터 다시 시작할 때 사용"""
     st.session_state.source_df = None
     st.session_state.source_is_analyzed = False
     st.session_state.analyzed_df = None

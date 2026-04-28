@@ -1,3 +1,11 @@
+'''
+이 파일은 Google Play Store에서 앱 리뷰를 수집하는 기능을 담당합니다.
+A. 모듈 임포트: 필요한 라이브러리 로딩
+B. Streamlit 캐시 데코레이터 및 예외 정의
+C. 리뷰 수집 함수 정의: 최신 리뷰를 안전하게 최대 개수까지 수집하는 함수와 특정 기간 이후의 리뷰만 수집하는 함수 정의
+D. 리뷰 분석기 캐싱 함수 정의: 리뷰 분석기 인스턴스를 Streamlit 캐시로 관리하여 모델 로딩을 최적화하는 함수 정의
+'''
+
 # A. 모듈 임포트
 from datetime import date, timedelta
 from google_play_scraper import Sort, reviews
