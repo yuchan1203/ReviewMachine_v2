@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>ReviewMachine V2</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#app-content">Skip to content</a>
+  <div class="container" id="app-content">
+    <h1>ReviewMachine V2</h1>
+    <p class="lead">앱 리뷰 분석을 빠르게 수행합니다. 예시 버튼을 클릭하면 App ID가 채워집니다.</p>
+    <div class="examples" aria-label="예시 앱 목록">
+      <strong>예시 앱:</strong>
+      <button type="button" class="example-btn" data-appid="com.facebook.katana" aria-pressed="false">Facebook</button>
+      <button type="button" class="example-btn" data-appid="com.whatsapp" aria-pressed="false">WhatsApp</button>
+      <button type="button" class="example-btn" data-appid="com.instagram.android" aria-pressed="false">Instagram</button>
+      <button type="button" class="example-btn" data-appid="com.twitter.android" aria-pressed="false">Twitter</button>
+      <button type="button" class="example-btn" data-appid="com.spotify.music" aria-pressed="false">Spotify</button>
+    </div>
+
+    <form id="analyzeForm" aria-describedby="formHelp">
+      <div class="form-row">
+        <label for="appId">App ID</label>
+        <input type="text" id="appId" name="app_id" required placeholder="com.example.app" aria-required="true">
+      </div>
+      <div class="form-row">
+        <label for="count">Count</label>
+        <input type="number" id="count" name="count" value="100" min="1">
+      </div>
+      <div class="form-row">
+        <label for="hfToken">Hugging Face Token (옵션)</label>
+        <input type="password" id="hfToken" name="hf_token" placeholder="hf_xxx..." aria-label="Hugging Face 토큰">
+      </div>
+      <div class="form-actions">
+        <button type="submit" id="submitBtn">Analyze</button>
+        <button type="button" id="downloadBtn">Download CSV</button>
+      </div>
+      <div id="formHelp" class="sr-only">App ID는 패키지 이름 형식(com.example.app)으로 입력하세요.</div>
+    </form>
+
+    <div id="status" role="status" aria-live="polite"></div>
+    <div id="spinner" class="spinner" aria-hidden="true" hidden></div>
+    <pre id="result" tabindex="0" aria-label="분석 결과"></pre>
+
+    <hr />
+    <section aria-labelledby="uploadHeading">
+      <h2 id="uploadHeading">CSV 업로드</h2>
+      <form id="uploadForm">
+        <input type="file" id="fileInput" accept=".csv" aria-label="CSV 파일 업로드">
+        <button type="submit" id="uploadBtn">Upload CSV</button>
+        <div id="uploadStatus" role="status" aria-live="polite"></div>
+      </form>
+    </section>
+
+    <section aria-labelledby="chartsHeading">
+      <h2 id="chartsHeading">분석 시각화</h2>
+      <div id="charts">
+        <div id="pieChart" class="chart" aria-label="감성 분포 차트"></div>
+        <div id="lineChart" class="chart" aria-label="타임라인 차트"></div>
+      </div>
+    </section>
+  </div>
+  <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>

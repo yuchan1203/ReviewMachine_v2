@@ -14,7 +14,6 @@ F. 감정 분석 실행 함수 정의: 입력 데이터 검증, 리뷰 분석기
 # A-1. 표준 라이브러리
 from datetime import datetime
 import pandas as pd
-import streamlit as st
 
 # A-2. 프로젝트 내부 모듈
 from app_scraper import get_reviews
@@ -62,7 +61,6 @@ def validate_input_dataframe(df):
         raise ReviewPipelineError("리뷰 본문(content)에 분석 가능한 텍스트가 없습니다.")
 
 
-@st.cache_data(show_spinner=False)
 
 
 # E. 리뷰 데이터 로딩 함수 정의

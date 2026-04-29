@@ -4,15 +4,22 @@
 또한, 예외 처리를 통해 사용자에게 명확한 피드백을 제공할 수 있도록 설계되었습니다.
 '''
 
-# A. 모델 임포트
-import streamlit as st
-from transformers import pipeline
+"""
+A lightweight analyzer factory with simple in-memory caching to replace
+Streamlit's `cache_resource` decorator. Keeps one cached analyzer per
+`device` key.
+"""
+from functools import lru_cache
 
-# B. 리뷰 분석기 정의
-@st.cache_resource(show_spinner=False)
-def get_review_analyzer(device="cpu"):
-    """ReviewAnalyzer 인스턴스를 캐시하여 재시작 시 모델을 다시 로드하지 않음"""
-    return ReviewAnalyzer(device=device)
+
+@lru_cache(maxsize=16)
+def get_review_analyzer(device="cpu", hf_token: str | None = None):
+    """Return a cached ReviewAnalyzer for the given device and optional HF token.
+
+    The HF token is included in the cache key so callers that pass a different
+    token will get a separate analyzer instance which can load private models.
+    """
+    return ReviewAnalyzer(device=device, hf_token=hf_token)
 
 # C. 예외 정의
 class ReviewPipelineError(Exception):
@@ -39,15 +46,43 @@ def validate_input_dataframe(df):
 # E. 리뷰 분석기 클래스
 class ReviewAnalyzer:
     # E-1. 초기화: 모델 로드 및 디바이스 설정
-    def __init__(self, device="cpu", mode="transformers"):
-        device_map = 0 if device != "cpu" else -1
+    def __init__(self, device="cpu", mode="transformers", hf_token: str | None = None):
         self.mode = mode
         self.device = device
-        self.model = pipeline(
-            "sentiment-analysis", 
-            model="jaehyeong/koelectra-base-v3-generalized-sentiment-analysis",
-            device=device_map
-        )
+        self.model = None
+        self.hf_token = hf_token
+
+        # Try to import transformers.pipeline lazily and construct the model
+        if mode == "transformers":
+            try:
+                from transformers import pipeline
+                _HAS = True
+            except Exception:
+                pipeline = None
+                _HAS = False
+
+            if _HAS:
+                device_map = 0 if device != "cpu" else -1
+                try:
+                    # Pass the Hugging Face auth token when provided so private
+                    # models or gated checkpoints can be loaded.
+                    kwargs = {"device": device_map}
+                    if self.hf_token:
+                        kwargs["use_auth_token"] = self.hf_token
+                    self.model = pipeline(
+                        "sentiment-analysis",
+                        model="jaehyeong/koelectra-base-v3-generalized-sentiment-analysis",
+                        **kwargs,
+                    )
+                except Exception:
+                    # Fall back to rule-based if model fails to load
+                    self.model = None
+                    self.mode = "rule_based"
+            else:
+                self.model = None
+                self.mode = "rule_based"
+        else:
+            self.mode = "rule_based"
 
     # E-2. 런타임 정보 반환
     def runtime_info(self):
@@ -59,9 +94,14 @@ class ReviewAnalyzer:
     
     # E-3. 감정 분석 결과를 5단계로 세분화하는 로직
     def _refine_sentiment(self, result):
-        label = result['label']
-        score = result['score']
-        if label == '1':
+        # Normalize label handling from various models
+        label = str(result.get('label', '')).lower()
+        score = float(result.get('score', 0.0))
+
+        # Interpret label heuristically: positive vs negative
+        is_positive = any(k in label for k in ['1', 'pos', 'positive', '긍정'])
+
+        if is_positive:
             if score >= 0.85:
                 return '매우 긍정', 2
             elif score >= 0.55:
@@ -98,7 +138,7 @@ class ReviewAnalyzer:
     
     # E-5. 텍스트 리스트에 대한 감정 분석 수행
     def analyze_list(self, texts):
-        if self.mode == "rule_based":
+        if self.mode == "rule_based" or (self.mode == "transformers" and self.model is None):
             refined = []
             for text in texts:
                 sentiment, sentiment_score, confidence = self._rule_based_score(text)
