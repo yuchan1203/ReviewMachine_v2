@@ -15,3 +15,5 @@ def initialize_session_state():
         st.session_state.current_app_id = ""
     if "analysis_runtime_info" not in st.session_state:
         st.session_state.analysis_runtime_info = None
+    if "hf_token" not in st.session_state:
+        st.session_state.hf_token = ""

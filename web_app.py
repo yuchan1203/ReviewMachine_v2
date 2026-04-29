@@ -9,7 +9,6 @@ from datetime import date
 
 # A-2. 내부 모듈 임포트
 import streamlit as st
-from transformers import logging
 
 # A-3. 앱 모듈 임포트
 from review_pipeline import ReviewPipelineError, load_source_dataframe, run_sentiment_analysis
@@ -21,10 +20,21 @@ from ui_sections import (
     render_timeline_section,
 )
 
+# Optional Hugging Face hub helper (used when user supplies a token)
+try:
+    import huggingface_hub as hf_hub
+    _HAS_HF_HUB = True
+except Exception:
+    hf_hub = None
+    _HAS_HF_HUB = False
+
 
 # B. 경고 무시 및 로깅 레벨 설정
 warnings.filterwarnings("ignore")
-logging.set_verbosity_error()
+# Avoid importing `transformers` at module import time; importing it can
+# trigger heavy submodule imports (and require `torch`). Transformers
+# logging will be set inside the analyzer module when the package is
+# actually used.
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
 
@@ -34,11 +44,43 @@ def _render_crawl_progress():
     progress.progress(20, text="크롤링 대상 정보를 확인하고 있습니다...")
     return progress
 
-# D-1. 입력 데이터 검증 함수
-REQUIRED_COLUMNS = ["at", "content"]
-def validate_input_dataframe(df):
-    if df is None:
-        raise ReviewPipelineError("데이터를 불러오지 못했습니다.")
+
+def _render_hf_token_section():
+    """Render a small UI for the user to input a Hugging Face token.
+
+    The token is stored in `st.session_state['hf_token']` and exported to
+    environment variables so downstream model loaders (transformers /
+    huggingface_hub) can use it.
+    """
+    with st.expander("🔐 Hugging Face 인증 (선택)", expanded=False):
+        current = st.session_state.get("hf_token", "")
+        token = st.text_input("Hugging Face 토큰 입력", value=current, type="password", key="hf_token_input")
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("저장", key="btn_save_hf_token"):
+                if token:
+                    st.session_state.hf_token = token
+                    os.environ["HF_TOKEN"] = token
+                    os.environ["HUGGINGFACE_HUB_TOKEN"] = token
+                    try:
+                        if _HAS_HF_HUB:
+                            hf_hub.login(token=token)
+                        st.success("토큰이 저장되었습니다.")
+                    except Exception as exc:
+                        st.error(f"토큰 저장에 실패했습니다: {exc}")
+        with col2:
+            if st.button("삭제", key="btn_clear_hf_token"):
+                st.session_state.hf_token = ""
+                os.environ.pop("HF_TOKEN", None)
+                os.environ.pop("HUGGINGFACE_HUB_TOKEN", None)
+                st.success("토큰을 제거했습니다.")
+        if st.session_state.get("hf_token"):
+            # Mask token display
+            tok = st.session_state['hf_token']
+            masked = "•" * max(4, len(tok) - 4) + tok[-4:]
+            st.caption(f"저장된 토큰: {masked}")
+
+# D-1. 입력 데이터 검증 함수 (위임): review_pipeline.validate_input_dataframe 사용
 
 
 # D-2. 분석 진행 상황 표시 함수
@@ -62,11 +104,7 @@ def _resolve_actual_device(requested_device):
     return "cpu"
 
 
-# F. 입력 데이터 검증 함수
-REQUIRED_COLUMNS = ["at", "content"]
-def validate_input_dataframe(df):
-    if df is None:
-        raise ReviewPipelineError("데이터를 불러오지 못했습니다.")
+# F. 입력 데이터 검증 함수 (위임)
 
 
 # G. 데이터프레임이 비어있는지 확인
@@ -81,48 +119,10 @@ def init_navigation_state():
         st.session_state.nav_state = "main"
 
 
-# I. 입력 데이터 검증 함수 (통합)
-def validate_input_dataframe(df):
-    if df is None:
-        raise ReviewPipelineError("데이터를 불러오지 못했습니다.")
-    if df.empty:
-        raise ReviewPipelineError("리뷰 데이터가 비어 있습니다.")
-    missing_columns = [col for col in REQUIRED_COLUMNS if col not in df.columns]
-    if missing_columns:
-        raise ReviewPipelineError(
-            f"필수 컬럼이 없습니다: {', '.join(missing_columns)}. "
-            "CSV에 at, content 컬럼이 포함되어 있는지 확인해주세요."
-        )
-    non_empty_content = df["content"].astype(str).str.strip() != ""
-    if not non_empty_content.any():
-        raise ReviewPipelineError("리뷰 본문(content)에 분석 가능한 텍스트가 없습니다.")
+# I. 입력 데이터 검증 함수 (통합, 위임)
 
 
-# J. 입력 데이터 검증 함수 (분리된 단계)
-def validate_input_dataframe(df):
-    # J-1. 데이터프레임이 None인지 확인
-    if df is None:
-        raise ReviewPipelineError("데이터를 불러오지 못했습니다.")
-    
-    # J-2. 데이터프레임이 비어있는지 확인
-    if df.empty:
-        raise ReviewPipelineError("리뷰 데이터가 비어 있습니다.")
-
-    # J-3. 필수 컬럼 존재 여부 확인
-    missing_columns = [col for col in REQUIRED_COLUMNS if col not in df.columns]
-    if missing_columns:
-        raise ReviewPipelineError(
-            f"필수 컬럼이 없습니다: {', '.join(missing_columns)}. "
-            "CSV에 at, content 컬럼이 포함되어 있는지 확인해주세요."
-        )
-    
-    # J-4. 리뷰 본문(content)에 분석 가능한 텍스트가 있는지 확인
-    non_empty_content = df["content"].astype(str).str.strip() != ""
-
-    # J-5. 분석 가능한 텍스트가 하나도 없는 경우 예외 발생
-    if not non_empty_content.any():
-        raise ReviewPipelineError("리뷰 본문(content)에 분석 가능한 텍스트가 없습니다.")
-    
+# J. 입력 데이터 검증 함수 (분리된 단계, 위임)
 
 # K. 네비게이션 함수 및 상태 초기화
 def navigate_to(state):
@@ -327,6 +327,8 @@ def render_continue_analysis():
     
     st.markdown("## ▶ 이어서 분석")
     st.markdown("---")
+    # Hugging Face 토큰 입력 섹션 (분석 전에 토큰을 입력할 수 있도록)
+    _render_hf_token_section()
     
     # 크롤링 데이터 표시
     st.subheader("1단계 완료: 크롤링 데이터")

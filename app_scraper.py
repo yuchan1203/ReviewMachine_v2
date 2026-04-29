@@ -8,9 +8,19 @@ D. 리뷰 분석기 캐싱 함수 정의: 리뷰 분석기 인스턴스를 Strea
 
 # A. 모듈 임포트
 from datetime import date, timedelta
-from google_play_scraper import Sort, reviews
 import pandas as pd
 import streamlit as st
+
+# google_play_scraper is optional for demo / development. If it's not
+# installed, the app will fall back to synthetic sample data so the UI
+# can still be exercised without network access or heavy dependencies.
+try:
+    from google_play_scraper import Sort, reviews
+    _HAS_GOOGLE_PLAY_SCRAPER = True
+except Exception:
+    Sort = None
+    reviews = None
+    _HAS_GOOGLE_PLAY_SCRAPER = False
 
 
 # B. Streamlit 캐시 데코레이터 및 예외 정의
@@ -96,13 +106,28 @@ def get_reviews(
 ):
     
     # E-2. 수집 모드에 따라 리뷰를 수집하는 함수 호출
-    if crawl_mode == "period_all":
-        safe_days = max(1, int(period_days or 1))
-        start_date = date.today() - timedelta(days=safe_days)
-        collected = _get_reviews_since(app_id, start_date)
+    # If google_play_scraper isn't available, provide a small synthetic
+    # dataset so the app can run for demo purposes.
+    if not _HAS_GOOGLE_PLAY_SCRAPER:
+        sample_count = min(100, max(1, int(count)))
+        collected = []
+        for i in range(sample_count):
+            collected.append(
+                {
+                    "at": pd.Timestamp.now() - pd.Timedelta(days=i),
+                    "userName": f"sample_user_{i}",
+                    "score": 5 - (i % 5),
+                    "content": f"샘플 리뷰 내용 {i} - 만족" if i % 2 == 0 else f"샘플 리뷰 내용 {i} - 불만족",
+                }
+            )
     else:
-        safe_count = max(1, min(10000, int(count)))
-        collected = _get_reviews_latest(app_id, safe_count)
+        if crawl_mode == "period_all":
+            safe_days = max(1, int(period_days or 1))
+            start_date = date.today() - timedelta(days=safe_days)
+            collected = _get_reviews_since(app_id, start_date)
+        else:
+            safe_count = max(1, min(10000, int(count)))
+            collected = _get_reviews_latest(app_id, safe_count)
     
     # E-3. 수집된 리뷰를 데이터프레임으로 변환하고, 날짜 형식으로 변환하여 정렬
     df = pd.DataFrame(collected)
