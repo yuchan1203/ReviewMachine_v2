@@ -11,9 +11,23 @@ from datetime import date, timedelta
 import pandas as pd
 from threading import Lock
 
+<<<<<<< HEAD
 # Simple in-memory cache to replace Streamlit cache usage
 _REVIEWS_CACHE = {}
 _REVIEWS_CACHE_LOCK = Lock()
+=======
+# google_play_scraper is optional for demo / development. If it's not
+# installed, the app will fall back to synthetic sample data so the UI
+# can still be exercised without network access or heavy dependencies.
+try:
+    from google_play_scraper import Sort, reviews
+    _HAS_GOOGLE_PLAY_SCRAPER = True
+except Exception:
+    Sort = None
+    reviews = None
+    _HAS_GOOGLE_PLAY_SCRAPER = False
+
+>>>>>>> b9b8b76aa51729b16ac6e463598c50f47734bdce
 
 # google_play_scraper is optional for demo / development. If it's not
 # installed, the app will fall back to synthetic sample data so the UI
@@ -108,12 +122,15 @@ def get_reviews(
     # E-2. 수집 모드에 따라 리뷰를 수집하는 함수 호출
     # If google_play_scraper isn't available, provide a small synthetic
     # dataset so the app can run for demo purposes.
+<<<<<<< HEAD
     cache_key = (app_id, int(count), crawl_mode, period_days)
     with _REVIEWS_CACHE_LOCK:
         cached = _REVIEWS_CACHE.get(cache_key)
     if cached is not None:
         return cached
 
+=======
+>>>>>>> b9b8b76aa51729b16ac6e463598c50f47734bdce
     if not _HAS_GOOGLE_PLAY_SCRAPER:
         sample_count = min(100, max(1, int(count)))
         collected = []

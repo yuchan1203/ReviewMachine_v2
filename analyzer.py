@@ -4,6 +4,7 @@
 또한, 예외 처리를 통해 사용자에게 명확한 피드백을 제공할 수 있도록 설계되었습니다.
 '''
 
+<<<<<<< HEAD
 """
 A lightweight analyzer factory with simple in-memory caching to replace
 Streamlit's `cache_resource` decorator. Keeps one cached analyzer per
@@ -20,6 +21,23 @@ def get_review_analyzer(device="cpu", hf_token: str | None = None):
     token will get a separate analyzer instance which can load private models.
     """
     return ReviewAnalyzer(device=device, hf_token=hf_token)
+=======
+# A. 모델 임포트
+import streamlit as st
+# Defer importing `transformers` until model construction to avoid
+# pulling heavy dependencies (like `torch`) at module import time.
+_HAS_TRANSFORMERS = None
+
+# B. 리뷰 분석기 정의
+@st.cache_resource(show_spinner=False)
+def get_review_analyzer(device="cpu"):
+    """ReviewAnalyzer 인스턴스를 캐시하여 재시작 시 모델을 다시 로드하지 않음
+
+    If the `transformers` package is not available, this will return a
+    rule-based analyzer so the app can run without heavy dependencies.
+    """
+    return ReviewAnalyzer(device=device)
+>>>>>>> b9b8b76aa51729b16ac6e463598c50f47734bdce
 
 # C. 예외 정의
 class ReviewPipelineError(Exception):
@@ -46,11 +64,18 @@ def validate_input_dataframe(df):
 # E. 리뷰 분석기 클래스
 class ReviewAnalyzer:
     # E-1. 초기화: 모델 로드 및 디바이스 설정
+<<<<<<< HEAD
     def __init__(self, device="cpu", mode="transformers", hf_token: str | None = None):
         self.mode = mode
         self.device = device
         self.model = None
         self.hf_token = hf_token
+=======
+    def __init__(self, device="cpu", mode="transformers"):
+        self.mode = mode
+        self.device = device
+        self.model = None
+>>>>>>> b9b8b76aa51729b16ac6e463598c50f47734bdce
 
         # Try to import transformers.pipeline lazily and construct the model
         if mode == "transformers":
@@ -64,6 +89,7 @@ class ReviewAnalyzer:
             if _HAS:
                 device_map = 0 if device != "cpu" else -1
                 try:
+<<<<<<< HEAD
                     # Pass the Hugging Face auth token when provided so private
                     # models or gated checkpoints can be loaded.
                     kwargs = {"device": device_map}
@@ -73,6 +99,12 @@ class ReviewAnalyzer:
                         "sentiment-analysis",
                         model="jaehyeong/koelectra-base-v3-generalized-sentiment-analysis",
                         **kwargs,
+=======
+                    self.model = pipeline(
+                        "sentiment-analysis",
+                        model="jaehyeong/koelectra-base-v3-generalized-sentiment-analysis",
+                        device=device_map,
+>>>>>>> b9b8b76aa51729b16ac6e463598c50f47734bdce
                     )
                 except Exception:
                     # Fall back to rule-based if model fails to load
